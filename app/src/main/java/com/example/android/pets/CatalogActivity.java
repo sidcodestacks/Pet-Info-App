@@ -15,26 +15,26 @@
  */
 package com.example.android.pets;
 
+import android.app.LoaderManager;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.Loader;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.TextView;
+import android.widget.ListView;
+
 import com.example.android.pets.data.PetContract.PetEntry;
-import com.example.android.pets.data.PetDbHelper;
 
-
-public class CatalogActivity extends AppCompatActivity {
-
+/**
+ * Displays list of pets that were entered and stored in the app.
+ */
+public class CatalogActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,12 +50,12 @@ public class CatalogActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
+        // Find the ListView which will be populated with the pet data
+        ListView petListView = (ListView) findViewById(R.id.list);
 
-//        mDbHelper=new PetDbHelper(this);
-//        displayDatabaseInfo();
-//        //PetDbHelper mDbHelper = new PetDbHelper(this);
-//        //SQLiteDatabase db = mDbHelper.getReadableDatabase();
-
+        // Find and set empty view on the ListView, so that it only shows when the list has 0 items.
+        View emptyView = findViewById(R.id.empty_view);
+        petListView.setEmptyView(emptyView);
     }
 
     @Override
@@ -64,81 +64,39 @@ public class CatalogActivity extends AppCompatActivity {
         displayDatabaseInfo();
     }
 
+    /**
+     * Temporary helper method to display information in the onscreen TextView about the state of
+     * the pets database.
+     */
     private void displayDatabaseInfo() {
-
-      //  SQLiteDatabase db = mDbHelper.getReadableDatabase();
-
-
-        String[] projection= {
+        // Define a projection that specifies which columns from the database
+        // you will actually use after this query.
+        String[] projection = {
                 PetEntry._ID,
                 PetEntry.COLUMN_PET_NAME,
                 PetEntry.COLUMN_PET_BREED,
                 PetEntry.COLUMN_PET_GENDER,
-                PetEntry.COLUMN_PET_WEIGHT
-        };
+                PetEntry.COLUMN_PET_WEIGHT };
 
-     /*   Cursor cursor= db.query(
-                PetEntry.TABLE_NAME,
-                projection,
-                null,
-                null,
-                null,
-                null,
-                null);
-     */
-     Cursor cursor= getContentResolver().query(
-             PetEntry.CONTENT_URI,projection,
-             null,
-             null,
-             null);
-        TextView displayView = (TextView) findViewById(R.id.text_view_pet);
+        // Perform a query on the provider using the ContentResolver.
+        // Use the {@link PetEntry#CONTENT_URI} to access the pet data.
+        Cursor cursor = getContentResolver().query(
+                PetEntry.CONTENT_URI,   // The content URI of the words table
+                projection,             // The columns to return for each row
+                null,                   // Selection criteria
+                null,                   // Selection criteria
+                null);                  // The sort order for the returned rows
 
-        // PetDbHelper mDbHelper = new PetDbHelper(this);
+        // Find the ListView which will be populated with the pet data
+        ListView petListView = (ListView) findViewById(R.id.list);
 
+        // Setup an Adapter to create a list item for each row of pet data in the Cursor.
+        PetCursorAdapter adapter = new PetCursorAdapter(this, cursor);
 
-       // Cursor cursor = db.rawQuery("SELECT * FROM " + PetEntry.TABLE_NAME, null);
-        try {
-
-            displayView.setText("The pets table contains " + cursor.getCount() + " pets.\n\n");
-            displayView.append(PetEntry._ID + " - " +
-                    PetEntry.COLUMN_PET_NAME + " - " +
-                    PetEntry.COLUMN_PET_BREED + " - " +
-                    PetEntry.COLUMN_PET_GENDER + " - " +
-                    PetEntry.COLUMN_PET_WEIGHT + "\n");
-
-            // Figure out the index of each column
-            int idColumnIndex = cursor.getColumnIndex(PetEntry._ID);
-            int nameColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_NAME);
-            int breedColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_BREED);
-            int genderColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_GENDER);
-            int weightColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_WEIGHT);
-
-            // Iterate through all the returned rows in the cursor
-            while (cursor.moveToNext()) {
-                // Use that index to extract the String or Int value of the word
-                // at the current row the cursor is on.
-                int currentID = cursor.getInt(idColumnIndex);
-                String currentName = cursor.getString(nameColumnIndex);
-                String currentBreed = cursor.getString(breedColumnIndex);
-                int currentGender = cursor.getInt(genderColumnIndex);
-                int currentWeight = cursor.getInt(weightColumnIndex);
-                // Display the values from each column of the current row in the cursor in the TextView
-                displayView.append(("\n" + currentID + " - " +
-                        currentName + " - " +
-                        currentBreed + " - " +
-                        currentGender + " - " +
-                        currentWeight));
-
-                //TextView displayView = (TextView) findViewById(R.id.text_view_pet);
-                //displayView.setText("Number of rows in pets database table: " + cursor.getCount());
-            }
-
-        } finally {
-
-            cursor.close();
-        }
+        // Attach the adapter to the ListView.
+        petListView.setAdapter(adapter);
     }
-//////////////////////////////////////////////
+
     /**
      * Helper method to insert hardcoded pet data into the database. For debugging purposes only.
      */
@@ -158,11 +116,6 @@ public class CatalogActivity extends AppCompatActivity {
         Uri newUri = getContentResolver().insert(PetEntry.CONTENT_URI, values);
     }
 
-    //////////////////////////////////////////
-
-
-
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu options from the res/menu/menu_catalog.xml file.
@@ -177,7 +130,6 @@ public class CatalogActivity extends AppCompatActivity {
         switch (item.getItemId()) {
             // Respond to a click on the "Insert dummy data" menu option
             case R.id.action_insert_dummy_data:
-                // Do nothing for now
                 insertPet();
                 displayDatabaseInfo();
                 return true;
@@ -187,5 +139,20 @@ public class CatalogActivity extends AppCompatActivity {
                 return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
+        return null;
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
+
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+
     }
 }
